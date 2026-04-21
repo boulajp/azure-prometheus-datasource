@@ -7,14 +7,17 @@ import React, { ChangeEvent, useMemo } from 'react';
 
 import { getAzureCloudOptions } from './AzureCredentialsConfig';
 import CurrentUserFallbackCredentials from './CurrentUserFallbackCredentials';
+import { FederatedIdentityCredentials, FederatedIdentityCredentialsType } from './FederatedIdentityCredentials';
+
+export type ExtendedAzureAuthType = AzureAuthType | 'federatedidentity';
 
 export interface Props {
   managedIdentityEnabled: boolean;
   workloadIdentityEnabled: boolean;
   userIdentityEnabled: boolean;
-  credentials: AzureCredentials;
+  credentials: AzureCredentials | FederatedIdentityCredentialsType;
   azureCloudOptions?: SelectableValue[];
-  onCredentialsChange: (updatedCredentials: AzureCredentials) => void;
+  onCredentialsChange: (updatedCredentials: AzureCredentials | FederatedIdentityCredentialsType) => void;
   getSubscriptions?: () => Promise<SelectableValue[]>;
   disabled?: boolean;
 }
@@ -31,7 +34,7 @@ export const AzureCredentialsForm = (props: Props) => {
   } = props;
 
   const authTypeOptions = useMemo(() => {
-    let opts: Array<SelectableValue<AzureAuthType>> = [
+    let opts: Array<SelectableValue<ExtendedAzureAuthType>> = [
       {
         value: 'clientsecret',
         label: t(
@@ -55,6 +58,16 @@ export const AzureCredentialsForm = (props: Props) => {
       });
     }
 
+    if (managedIdentityEnabled || workloadIdentityEnabled) {
+      opts.push({
+        value: 'federatedidentity',
+        label: t(
+          'configuration.azure-credentials-form.auth-type-options.label.federated-identity',
+          'Federated Identity (Cross-Tenant)'
+        ),
+      });
+    }
+
     if (userIdentityEnabled) {
       opts.unshift({
         value: 'currentuser',
@@ -65,17 +78,28 @@ export const AzureCredentialsForm = (props: Props) => {
     return opts;
   }, [managedIdentityEnabled, workloadIdentityEnabled, userIdentityEnabled]);
 
-  const onAuthTypeChange = (selected: SelectableValue<AzureAuthType>) => {
+  const onAuthTypeChange = (selected: SelectableValue<ExtendedAzureAuthType>) => {
     const defaultAuthType = userIdentityEnabled
       ? 'currentuser'
       : workloadIdentityEnabled
         ? 'workloadidentity'
         : 'clientsecret';
-    const updated: AzureCredentials = {
-      ...credentials,
-      authType: selected.value || defaultAuthType,
-    };
-    onCredentialsChange(updated);
+    const newAuthType = selected.value || defaultAuthType;
+
+    if (newAuthType === 'federatedidentity') {
+      const defaultSource = managedIdentityEnabled ? 'msi' : 'workloadidentity';
+      onCredentialsChange({
+        authType: 'federatedidentity',
+        sourceIdentityType: defaultSource,
+        federatedCredentialAudience: 'api://AzureADTokenExchange',
+      } as FederatedIdentityCredentialsType);
+    } else {
+      const updated: AzureCredentials = {
+        ...credentials,
+        authType: newAuthType as AzureAuthType,
+      };
+      onCredentialsChange(updated);
+    }
   };
 
   const onAzureCloudChange = (selected: SelectableValue<string>) => {
@@ -263,6 +287,15 @@ export const AzureCredentialsForm = (props: Props) => {
         <CurrentUserFallbackCredentials
           credentials={credentials}
           azureCloudOptions={getAzureCloudOptions()}
+          onCredentialsChange={onCredentialsChange}
+          disabled={disabled}
+          managedIdentityEnabled={managedIdentityEnabled}
+          workloadIdentityEnabled={workloadIdentityEnabled}
+        />
+      )}
+      {credentials.authType === 'federatedidentity' && (
+        <FederatedIdentityCredentials
+          credentials={credentials as FederatedIdentityCredentialsType}
           onCredentialsChange={onCredentialsChange}
           disabled={disabled}
           managedIdentityEnabled={managedIdentityEnabled}

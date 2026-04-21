@@ -12,6 +12,10 @@ import { DataSourceSettings, SelectableValue } from '@grafana/data';
 import { PromOptions } from '@grafana/prometheus';
 import { config } from '@grafana/runtime';
 
+import { FederatedIdentityCredentialsType } from './FederatedIdentityCredentials';
+
+export type ExtendedAzureCredentials = AzureCredentials | FederatedIdentityCredentialsType;
+
 export function getAzureCloudOptions(): Array<SelectableValue<string>> {
   const cloudInfo = getAzureClouds();
 
@@ -28,7 +32,13 @@ export function getDefaultCredentials(): AzureCredentials {
   return { authType: 'clientsecret', azureCloud: getDefaultAzureCloud() };
 }
 
-export function getCredentials(options: AzureDataSourceSettings): AzureCredentials {
+export function getCredentials(options: AzureDataSourceSettings): ExtendedAzureCredentials {
+  // Handle federated identity credentials locally since @grafana/azure-sdk doesn't know about them
+  const rawCredentials = options.jsonData.azureCredentials as ExtendedAzureCredentials | undefined;
+  if (rawCredentials?.authType === 'federatedidentity') {
+    return rawCredentials as FederatedIdentityCredentialsType;
+  }
+
   const credentials = getDatasourceCredentials(options);
   if (credentials) {
     return credentials;
@@ -39,9 +49,24 @@ export function getCredentials(options: AzureDataSourceSettings): AzureCredentia
 
 export function updateCredentials(
   options: AzurePromDataSourceSettings,
-  credentials: AzureCredentials
+  credentials: ExtendedAzureCredentials
 ): AzurePromDataSourceSettings {
-  return updateDatasourceCredentials(options, credentials);
+  // Handle federated identity credentials locally since @grafana/azure-sdk doesn't know about them
+  if (credentials.authType === 'federatedidentity') {
+    return {
+      ...options,
+      jsonData: {
+        ...options.jsonData,
+        azureCredentials: credentials as unknown as AzureCredentials,
+        azureAuthType: undefined,
+        cloudName: undefined,
+        tenantId: undefined,
+        clientId: undefined,
+      },
+    };
+  }
+
+  return updateDatasourceCredentials(options, credentials as AzureCredentials);
 }
 
 export function setDefaultCredentials(options: AzurePromDataSourceSettings): AzurePromDataSourceSettings {

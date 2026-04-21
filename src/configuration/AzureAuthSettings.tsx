@@ -1,16 +1,16 @@
-import { AzureCredentials } from '@grafana/azure-sdk';
 import { DataSourceJsonData } from '@grafana/data';
 import { Trans } from '@grafana/i18n';
 import { config } from '@grafana/runtime';
 import React from 'react';
 import { useEffectOnce } from 'react-use';
 
+import { ExtendedAzureCredentials } from './AzureCredentialsConfig';
 import { getAzureCloudOptions } from './AzureCredentialsConfig';
 import { AzureCredentialsForm } from './AzureCredentialsForm';
 
 export interface HttpSettingsBaseProps<JSONData extends DataSourceJsonData = any, SecureJSONData = any> {
-  credentials: AzureCredentials;
-  onCredentialsChange: (updatedCredentials: AzureCredentials) => void;
+  credentials: ExtendedAzureCredentials;
+  onCredentialsChange: (updatedCredentials: ExtendedAzureCredentials) => void;
   disabled?: boolean;
 }
 
