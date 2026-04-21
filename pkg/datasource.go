@@ -74,11 +74,11 @@ func extendClientOpts(ctx context.Context, settings backend.DataSourceInstanceSe
 	}
 
 	// Set Azure authentication
-	if azureSettings.AzureAuthEnabled {
-		err = azureauth.ConfigureAzureAuthentication(settings, azureSettings, clientOpts, plog)
-		if err != nil {
-			return fmt.Errorf("error configuring Azure auth: %v", err)
-		}
+	// Always configure Azure auth for this plugin since it is Azure-specific.
+	// The GFAZPL_AZURE_AUTH_ENABLED env var may not be set for external plugins.
+	err = azureauth.ConfigureAzureAuthentication(settings, azureSettings, clientOpts, plog)
+	if err != nil {
+		return fmt.Errorf("error configuring Azure auth: %v", err)
 	}
 
 	return nil
